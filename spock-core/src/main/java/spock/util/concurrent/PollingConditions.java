@@ -15,7 +15,8 @@
 package spock.util.concurrent;
 
 import groovy.lang.Closure;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.spockframework.lang.ConditionBlock;
 import org.spockframework.runtime.GroovyRuntimeUtil;
 import org.spockframework.runtime.SpockTimeoutError;
@@ -43,6 +44,8 @@ import org.spockframework.util.Beta;
  */
 @Beta
 public class PollingConditions {
+  private final Logger log = LoggerFactory.getLogger(this.getClass());
+
   private double timeout = 1;
   private double initialDelay = 0;
   private double delay = 0.1;
@@ -126,7 +129,6 @@ public class PollingConditions {
    * Repeatedly evaluates the specified conditions until they are satisfied or the timeout has elapsed.
    *
    * @param conditions the conditions to evaluate
-   *
    * @throws InterruptedException if evaluation is interrupted
    */
   @ConditionBlock
@@ -138,11 +140,10 @@ public class PollingConditions {
    * Repeatedly evaluates the specified conditions until they are satisfied or the specified timeout (in seconds) has elapsed.
    *
    * @param conditions the conditions to evaluate
-   *
    * @throws InterruptedException if evaluation is interrupted
    */
   @ConditionBlock
-  public void within(double seconds, Closure<?> conditions) throws InterruptedException  {
+  public void within(double seconds, Closure<?> conditions) throws InterruptedException {
     long timeoutMillis = toMillis(seconds);
     long start = System.currentTimeMillis();
     long lastAttempt = 0;
@@ -158,6 +159,9 @@ public class PollingConditions {
         GroovyRuntimeUtil.invokeClosure(conditions);
         return;
       } catch (Throwable e) {
+        if (!(e instanceof AssertionError)) {
+          log.error("Found exception while asserting", e);
+        }
         long elapsedTime = lastAttempt - start;
         if (elapsedTime >= timeoutMillis) {
           String msg = String.format("Condition not satisfied after %1.2f seconds and %d attempts", elapsedTime / 1000d, attempts);

@@ -14,12 +14,17 @@
 
 package spock.util.concurrent
 
+import com.logcapture.junit.LogCaptureTrait
 import org.spockframework.runtime.ConditionNotSatisfiedError
 import org.spockframework.runtime.SpockTimeoutError
 import spock.lang.Issue
 import spock.lang.Specification
 
-class PollingConditionsSpec extends Specification {
+import static com.logcapture.assertion.ExpectedLoggedException.logException
+import static com.logcapture.assertion.ExpectedLoggingMessage.aLog
+import static org.hamcrest.Matchers.*
+
+class PollingConditionsSpec extends Specification implements LogCaptureTrait {
   PollingConditions conditions = new PollingConditions()
 
   volatile int num = 0
@@ -126,12 +131,35 @@ class PollingConditionsSpec extends Specification {
     then:
     condition.eventually {
       try {
-        sleep 200;
-        assert secondAttempt;
+        sleep 200
+        assert secondAttempt
       } finally {
         secondAttempt = true
       }
     }
+    logged(not(aLog().error()))
+  }
+
+  def "log errors when exceptions are thrown eventually"() {
+    given:
+    def iteration = 0
+
+    when:
+    new PollingConditions().eventually {
+      try {
+        if (iteration < 2) {
+          throw new IllegalStateException("An exception is thrown")
+        }
+        assert true
+      } finally {
+        iteration++
+      }
+    }
+    then:
+    logged(aLog().error()
+      .havingException(logException()
+      .withException(isA(IllegalStateException)).withMessage(equalTo("An exception is thrown")))
+      .withMessage("Found exception while asserting"))
   }
 }
 
